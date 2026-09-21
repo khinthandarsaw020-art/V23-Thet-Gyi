@@ -1,0 +1,37 @@
+name: Deploy to Hugging Face Spaces
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git clone https://user:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME hf-space
+          cd hf-space
+          rsync -av --exclude='.git' --exclude='.github' ../ ./ || find .. -maxdepth 1 -type f -exec cp {} . \;
+          cat > README.md << 'EOF'
+          ---
+          title: V23.1 Live Bot
+          emoji: 🚀
+          sdk: docker
+          app_port: 7860
+          ---
+          EOF
+          git add .
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-deploy: ${{ github.sha }}"
+          git push
